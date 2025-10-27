@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Status Updater</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントを読み込む */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            overflow-x: hidden; /* 横スクロールバーの出現を防ぐ */
+        }
+    </style>
+    <!-- @apply を使うためのスタイル -->
+    <style type="text/tailwindcss">
+        /* カスタムフォームスタイル */
+        .form-input, .form-select {
+            @apply w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 transition-all duration-300 ease-in-out;
+            @apply focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500;
+        }
+        /* 送信ボタンのスタイル */
+        .btn-submit {
+            @apply w-full px-4 py-3 font-semibold text-white rounded-xl shadow-lg transition transform duration-300 ease-in-out;
+            @apply bg-gradient-to-r from-indigo-600 to-purple-600;
+            @apply hover:from-indigo-700 hover:to-purple-700 hover:scale-105 hover:shadow-xl;
+            @apply active:scale-95 active:shadow-md;
+            @apply focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:ring-offset-white;
+        }
+
+        /* ページロード時のフェードインアニメーション */
+        .fade-in {
+            animation: fadeInAnimation 0.8s ease-out forwards;
+            opacity: 0;
+        }
+        @keyframes fadeInAnimation {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-200 text-gray-900 flex items-center justify-center min-h-screen p-4 md:p-8">
+
+    <!-- メインカード -->
+    <div class="fade-in relative w-full max-w-5xl mx-auto bg-white p-8 md:p-10 rounded-2xl shadow-2xl grid grid-cols-1 md:grid-cols-2 md:divide-x md:divide-gray-200 gap-8 md:gap-10 transform transition-all duration-300 hover:shadow-3xl">
+        
+        <!-- 1. 設定ページへのリンク (右上に配置) -->
+        <div class="absolute top-6 right-6 md:top-8 md:right-10 z-10">
+            <a href="settings.html" title="Settings" class="text-gray-400 hover:text-indigo-600 transition-colors duration-300">
+                <!-- 歯車アイコン -->
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+            </a>
+        </div>
+        
+        <!-- 1. フォーム（左側） -->
+        <div class="w-full pr-0 md:pr-10">
+            <h1 class="text-3xl font-extrabold text-center text-gray-900 mb-6 tracking-tight">
+                Discord Status
+            </h1>
+
+            <!-- ステータス表示用のメッセージボックス -->
+            <div id="message-box" class="hidden p-4 mb-4 rounded-lg text-sm transition-all duration-300"></div>
+
+            <form id="status-form" class="space-y-5">
+                
+                <!-- App Key (Application) -->
+                <div>
+                    <label for="app_key" class="block text-sm font-semibold text-gray-600 mb-2">Application (App Name)</label>
+                    <!-- ★ ドロップダウンの中身はJavaScriptで動的に生成されます -->
+                    <select id="app_key" name="app_key" class="form-select">
+                        <option value="">Loading Apps...</option>
+                    </select>
+                </div>
+
+                <!-- 開始時刻 (Elapsed Timer) -->
+                <div>
+                    <label for="time_mode" class="block text-sm font-semibold text-gray-600 mb-2">開始時刻 (Elapsed Timer)</label>
+                    <select id="time_mode" name="time_mode" class="form-select">
+                        <!-- 誕生日のラベルを動的に変更 -->
+                        <option value="birthday" id="birthday-option">誕生日 (Loading...)</option>
+                        <option value="now">今から (Now)</option>
+                        <option value="custom">カスタム (Calendar)</option>
+                    </select>
+                </div>
+
+                <!-- カスタム日時入力 (カスタム選択時のみ表示) -->
+                <div id="custom-time-group" class="hidden transition-all duration-300">
+                    <label for="custom_time" class="block text-sm font-semibold text-gray-600 mb-2">カスタム日時</label>
+                    <input type="datetime-local" id="custom_time" name="custom_time" class="form-input">
+                </div>
+
+                <!-- Details -->
+                <div>
+                    <label for="details" class="block text-sm font-semibold text-gray-600 mb-2">Details (1行目)</label>
+                    <input type="text" id="details" name="details" class="form-input" placeholder="例: オンライン" required>
+                </div>
+
+                <!-- State -->
+                <div>
+                    <label for="state" class="block text-sm font-semibold text-gray-600 mb-2">State (2行目)</label>
+                    <input type="text" id="state" name="state" class="form-input" placeholder="例: 待機中..." required>
+                </div>
+
+                <!-- Large Image Key -->
+                <div>
+                    <label for="large_image" class="block text-sm font-semibold text-gray-600 mb-2">Large Image Key (オプション)</label>
+                    <input type="text" id="large_image" name="large_image" class="form-input" placeholder="main_icon">
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-2">
+                    <button type="submit" id="submit-button" class="btn-submit">
+                        <span id="submit-text">Update Status</span>
+                        <span id="submit-spinner" class="hidden">
+                            <!-- (スピナーSVG) -->
+                            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 inline-block text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Processing...
+                        </span>
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- 2. プレビュー（右側） -->
+        <div class="w-full pl-0 md:pl-10">
+            <h2 class="text-2xl font-bold text-center text-gray-900 mb-6 tracking-tight">
+                Live Preview
+            </h2>
+            <!-- Discord UI コンテナ -->
+            <div class="bg-[#36393F] p-5 rounded-lg shadow-inner text-white transition-all duration-300">
+                <!-- ユーザー情報 -->
+                <div class="flex items-center mb-5">
+                    <div class="relative w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center font-bold text-xl ring-2 ring-gray-900">
+                        U
+                        <!-- オンラインステータスバッジ -->
+                        <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-[#36393F] rounded-full"></div>
+                    </div>
+                    <div class="ml-4">
+                        <h3 class="font-semibold text-lg text-white">Your Name</h3>
+                        <p class="text-sm text-gray-400">Online</p>
+                    </div>
+                </div>
+
+                <!-- アクティビティプレビュー -->
+                <div class="bg-[#2F3136] rounded-lg p-4 shadow-md transition-all duration-300">
+                    <div class="flex items-start">
+                        <!-- Image Preview -->
+                        <div class="w-24 h-24 mr-4 flex-shrink-0">
+                            <img id="preview-image" src="https://placehold.co/100x100/7289DA/FFFFFF?text=icon" alt="Preview Image" class="w-full h-full rounded-lg object-cover">
+                        </div>
+                        
+                        <!-- Text Details -->
+                        <div class="overflow-hidden min-w-0">
+                            <div class="font-semibold text-sm text-gray-400 uppercase tracking-wide mb-1">
+                                Playing
+                            </div>
+                            
+                            <!-- App Name -->
+                            <div id="preview-app-name" class="font-bold text-lg text-white whitespace-nowrap overflow-hidden text-ellipsis">
+                                人生
+                            </div>
+                            
+                            <!-- Details -->
+                            <p id="preview-details" class="text-gray-300 text-sm whitespace-nowrap overflow-hidden text-ellipsis">オンライン</p>
+                            
+                            <!-- State -->
+                            <p id="preview-state" class="text-gray-300 text-sm whitespace-nowrap overflow-hidden text-ellipsis">待機中...</p>
+                            
+                            <!-- Elapsed Time -->
+                            <p id="preview-elapsed-time" class="text-gray-400 text-xs mt-1">00:00:00 経過</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- フォーム要素 ---
+        const form = document.getElementById('status-form');
+        const appSelect = document.getElementById('app_key'); // <select> element
+        const detailsInput = document.getElementById('details');
+        const stateInput = document.getElementById('state');
+        const imageInput = document.getElementById('large_image');
+        const messageBox = document.getElementById('message-box');
+        const submitButton = document.getElementById('submit-button');
+        const submitText = document.getElementById('submit-text');
+        const submitSpinner = document.getElementById('submit-spinner');
+        const timeModeSelect = document.getElementById('time_mode');
+        const customTimeGroup = document.getElementById('custom-time-group');
+        const customTimeInput = document.getElementById('custom_time');
+
+        // --- プレビュー要素 ---
+        const pAppName = document.getElementById('preview-app-name');
+        const pDetails = document.getElementById('preview-details');
+        const pState = document.getElementById('preview-state');
+        const pImage = document.getElementById('preview-image');
+        const pElapsedTime = document.getElementById('preview-elapsed-time');
+
+        // --- データマッピング ---
+        
+        // ★ Client ID のデフォルト値 (settings.html と一致)
+        const DEFAULT_APP_LIST = [
+            { key: "life", name: "人生", id: "1430896766579900509" },
+            { key: "study", name: "勉強", id: "1430896715245817920" },
+            { key: "school", name: "学校", id: "1430896902152392754" },
+            { key: "activity", name: "デフォルト", id: "1430880499500453888" }
+        ];
+        
+        // このグローバル変数は loadAppSettings() で設定される
+        let APP_LIST = []; 
+        
+        // ★ 誕生日のデフォルト値 (settings.html と一致)
+        const DEFAULT_BIRTHDAY_STRING = '2000-01-01';
+        // この変数は loadBirthdaySetting() で設定される
+        let birthdayStartTimeMs = 0; 
+        const birthdayOptionLabel = document.getElementById('birthday-option');
+
+
+        /**
+         * LocalStorageからアプリ設定を読み込み、ドロップダウンを生成する
+         */
+        function loadAppSettings() {
+            try {
+                const savedAppsString = localStorage.getItem('appList');
+                if (savedAppsString) {
+                    APP_LIST = JSON.parse(savedAppsString);
+                } else {
+                    APP_LIST = DEFAULT_APP_LIST;
+                }
+            } catch (e) {
+                console.error("Failed to read AppList from localStorage:", e);
+                APP_LIST = DEFAULT_APP_LIST;
+            }
+
+            // appSelect の中身をクリア
+            appSelect.innerHTML = ''; 
+            
+            if (APP_LIST.length === 0) {
+                 appSelect.innerHTML = '<option value="">設定画面でAppを追加してください</option>';
+                 return;
+            }
+
+            // 読み込んだリストでドロップダウン (<option>) を生成
+            APP_LIST.forEach(app => {
+                const option = document.createElement('option');
+                option.value = app.key; // 値は内部的なkey
+                option.textContent = app.name; // 表示はユーザー設定名
+                appSelect.appendChild(option);
+            });
+        }
+
+        /**
+         * LocalStorageから誕生日設定を読み込む
+         */
+        function loadBirthdaySetting() {
+            let birthdayString = DEFAULT_BIRTHDAY_STRING;
+            try {
+                const savedBirthday = localStorage.getItem('userBirthday');
+                if (savedBirthday) {
+                    birthdayString = savedBirthday;
+                }
+            } catch (e) {
+                console.error("Failed to read birthday from localStorage:", e);
+            }
+            birthdayStartTimeMs = new Date(birthdayString + "T00:00:00").getTime();
+            const formattedDate = birthdayString.replace(/-/g, '/');
+            birthdayOptionLabel.textContent = `誕生日 (${formattedDate})`;
+        }
+        
+        // --- ページ読み込み時に設定をロード ---
+        loadAppSettings();
+        loadBirthdaySetting();
+        
+
+        // --- 経過時間プレビュー更新関数 ---
+        // (ロジックは変更なし、birthdayStartTimeMs はグローバル変数を使用)
+        function updateElapsedTime() {
+            const timeMode = timeModeSelect.value;
+            let startTimeMs = 0;
+            let showTimer = true;
+
+            if (timeMode === 'birthday') {
+                startTimeMs = birthdayStartTimeMs; // グローバル変数
+            } else if (timeMode === 'now') {
+                startTimeMs = Date.now();
+                pElapsedTime.textContent = "00:00:00 経過";
+                showTimer = false; 
+            } else if (timeMode === 'custom') {
+                if (customTimeInput.value) {
+                    startTimeMs = new Date(customTimeInput.value).getTime();
+                } else {
+                    pElapsedTime.textContent = "カスタム日時を選択...";
+                    showTimer = false; 
+                }
+            }
+            // (以降の経過時間計算ロジックは変更なし)
+            if (showTimer && startTimeMs) {
+                const now = Date.now();
+                if (now >= startTimeMs) {
+                    const elapsedMs = now - startTimeMs;
+                    const elapsedSec = Math.floor(elapsedMs / 1000);
+                    const years = Math.floor(elapsedSec / (3600 * 24 * 365));
+                    const days = Math.floor((elapsedSec % (3600 * 24 * 365)) / (3600 * 24));
+                    const hours = Math.floor((elapsedSec % (3600 * 24)) / 3600);
+                    const minutes = Math.floor((elapsedSec % 3600) / 60);
+                    const seconds = elapsedSec % 60;
+                    if (years > 0) {
+                        pElapsedTime.textContent = `${years} 年 ${days} 日 経過`;
+                    } else if (days > 0) {
+                         pElapsedTime.textContent = `${days} 日 ${String(hours).padStart(2, '0')} 時間 経過`;
+                    } else {
+                        pElapsedTime.textContent = 
+                            `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')} 経過`;
+                    }
+                } else {
+                    pElapsedTime.textContent = "未来の時刻です";
+                }
+            }
+        }
+
+        // --- メインプレビュー更新関数 ---
+        function updatePreview() {
+            const selectedAppKey = appSelect.value; // key (e.g., "life")
+            const selectedApp = APP_LIST.find(app => app.key === selectedAppKey);
+
+            const details = detailsInput.value || "Details (1行目)";
+            const state = stateInput.value || "State (2行目)";
+            const imageKey = imageInput.value || "main_icon";
+
+            // ★ プレビューのApp名を、選択中の app.name に設定
+            pAppName.textContent = selectedApp ? selectedApp.name : "App";
+            pDetails.textContent = details;
+            pState.textContent = state;
+
+            const placeholderText = encodeURIComponent(imageKey);
+            pImage.src = `https://placehold.co/100x100/7289DA/FFFFFF?text=${placeholderText}`;
+            
+            updateElapsedTime();
+        }
+
+        // --- 経過時間タイマー (1秒ごと) ---
+        setInterval(updateElapsedTime, 1000);
+
+        // --- イベントリスナー ---
+        // (変更なし)
+        timeModeSelect.addEventListener('change', (e) => {
+            if (e.target.value === 'custom') {
+                customTimeGroup.classList.remove('hidden');
+                if (!customTimeInput.value) {
+                    const now = new Date();
+                    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                    customTimeInput.value = now.toISOString().slice(0, 16);
+                }
+            } else {
+                customTimeGroup.classList.add('hidden');
+            }
+            updatePreview();
+        });
+        appSelect.addEventListener('change', updatePreview);
+        detailsInput.addEventListener('input', updatePreview);
+        stateInput.addEventListener('input', updatePreview);
+        imageInput.addEventListener('input', updatePreview);
+        customTimeInput.addEventListener('change', updatePreview);
+
+        // --- メッセージボックス表示 (変更なし) ---
+        function showMessage(type, text) {
+            messageBox.classList.remove('hidden');
+            if (type === 'success') {
+                messageBox.className = 'p-4 mb-4 rounded-lg text-sm bg-green-100 text-green-800 border border-green-300';
+            } else if (type === 'error') {
+                messageBox.className = 'p-4 mb-4 rounded-lg text-sm bg-red-100 text-red-800 border border-red-300';
+            }
+            messageBox.textContent = text;
+        }
+        
+        // --- ボタンのロード状態切り替え (変更なし) ---
+        function setLoading(isLoading) {
+             if (isLoading) {
+                submitButton.disabled = true;
+                submitText.classList.add('hidden');
+                submitSpinner.classList.remove('hidden');
+                submitButton.classList.add('opacity-75', 'cursor-not-allowed');
+            } else {
+                submitButton.disabled = false;
+                submitText.classList.remove('hidden');
+                submitSpinner.classList.add('hidden');
+                submitButton.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        }
+
+        // --- フォーム送信処理 ---
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            setLoading(true);
+            showMessage('success', 'Sending update...');
+
+            const formData = new FormData(form);
+            const data = {};
+            let startTimestamp = null;
+            const timeMode = timeModeSelect.value;
+            
+            // 1. タイムスタンプの決定
+            if (timeMode === 'birthday') {
+                startTimestamp = Math.floor(birthdayStartTimeMs / 1000); 
+            } else if (timeMode === 'now') {
+                startTimestamp = Math.floor(Date.now() / 1000);
+            } else if (timeMode === 'custom') {
+                if (customTimeInput.value) {
+                    startTimestamp = Math.floor(new Date(customTimeInput.value).getTime() / 1000);
+                } else {
+                    showMessage('error', 'カスタム日時が選択されていません。');
+                    setLoading(false);
+                    return;
+                }
+            }
+            if (startTimestamp) {
+                data.start = startTimestamp;
+            }
+
+            // 2. フォームデータの構築
+            formData.forEach((value, key) => {
+                if (key === 'large_image' && !value) {
+                    return; // 空の画像キーは無視
+                }
+                // app_key (ドロップダウンの値=key) は含める
+                if (key !== 'time_mode' && key !== 'custom_time') {
+                    data[key] = value;
+                }
+            });
+            
+            // ★ 3. Client ID と App Name を data に追加
+            const selectedAppKey = data['app_key']; // "life" or UUID
+            const selectedApp = APP_LIST.find(app => app.key === selectedAppKey);
+            
+            if (selectedApp) {
+                data['client_id'] = selectedApp.id;   // 数値のID
+                data['app_name'] = selectedApp.name; // 表示名 (e.g., "人生")
+            } else {
+                showMessage('error', '有効な Application が選択されていません。設定を確認してください。');
+                setLoading(false);
+                return;
+            }
+
+            // 4. サーバーへ送信
+            try {
+                const response = await fetch('http://127.0.0.1:5000/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data),
+                });
+                const result = await response.json();
+                if (response.ok) {
+                    showMessage('success', `Success: ${result.message}`);
+                    updatePreview();
+                } else {
+                    showMessage('error', `Error: ${result.message || 'Unknown error'}`);
+                }
+            } catch (error) {
+                console.error('Fetch Error:', error);
+                showMessage('error', 'Failed to connect to the server (status.py). Is it running?');
+            } finally {
+                setLoading(false);
+            }
+        });
+        
+        // --- ページロード時の初期設定 ---
+        function initializeForm() {
+            // ★ デフォルト値を一般的なものに変更
+            // (app_key は loadAppSettings で自動的に先頭のものが選択される)
+            document.getElementById('time_mode').value = 'birthday'; 
+            document.getElementById('details').value = 'オンライン';
+            document.getElementById('state').value = '待機中...';
+            document.getElementById('large_image').value = 'main_icon';
+
+            // 初期プレビューを生成
+            updatePreview();
+            // time_modeの変更イベントを発火
+            timeModeSelect.dispatchEvent(new Event('change'));
+        }
+        
+        // 設定ロード後にフォーム初期化を実行
+        initializeForm();
+
+    </script>
+</body>
+</html>
+

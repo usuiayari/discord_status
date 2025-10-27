@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - Discord Status</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Interフォントを読み込む */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; overflow-x: hidden; }
+    </style>
+    <!-- @apply を使うためのスタイル -->
+    <style type="text/tailwindcss">
+        /* カスタムフォームスタイル */
+        .form-input {
+            @apply w-full px-4 py-3 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 transition-all duration-300 ease-in-out;
+            @apply focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500;
+        }
+        /* ボタン共通スタイル */
+        .btn {
+            @apply px-4 py-2 font-semibold rounded-lg shadow-md transition transform duration-300 ease-in-out;
+            @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+        }
+        .btn-primary {
+            @apply text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700;
+            @apply active:scale-95 focus:ring-indigo-500;
+        }
+        .btn-secondary {
+            @apply text-gray-700 bg-gray-100 hover:bg-gray-200;
+            @apply active:scale-95 focus:ring-gray-400;
+        }
+        .btn-danger {
+            @apply text-white bg-red-600 hover:bg-red-700;
+            @apply active:scale-95 focus:ring-red-500;
+        }
+        /* ラベル */
+        .form-label {
+             @apply block text-sm font-semibold text-gray-600 mb-2;
+        }
+        .form-desc {
+            @apply text-xs text-gray-500 mt-2;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-gray-50 to-gray-200 text-gray-900 flex items-center justify-center min-h-screen p-4 md:p-8">
+
+    <!-- メインカード -->
+    <div class="w-full max-w-2xl mx-auto bg-white p-8 md:p-10 rounded-2xl shadow-2xl space-y-8">
+        
+        <div class="flex justify-between items-center">
+            <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">
+                Settings
+            </h1>
+            <a href="index.html" class="text-indigo-600 hover:text-indigo-800 transition-colors duration-300 font-medium text-sm">
+                &larr; メイン画面に戻る
+            </a>
+        </div>
+
+        <!-- ステータス表示用のメッセージボックス -->
+        <div id="message-box" class="hidden p-4 rounded-lg text-sm transition-all duration-300"></div>
+
+        <!-- 1. 誕生日設定 -->
+        <div class="space-y-4">
+             <h2 class="text-xl font-bold text-gray-800 border-b pb-2">基本設定</h2>
+            <div>
+                <label for="birthday" class="form-label">誕生日 (Birthday)</label>
+                <input type="date" id="birthday" name="birthday" class="form-input" required>
+                <p class="form-desc">
+                    メイン画面の「誕生日」オプションの基準時刻として使用されます。
+                </p>
+            </div>
+            <button id="save-birthday-btn" class="btn btn-primary px-6 py-3">Save Birthday</button>
+        </div>
+
+        <!-- 2. Client ID 設定 -->
+        <div class="space-y-6">
+            <h2 class="text-xl font-bold text-gray-800 border-b pb-2">Application ID 管理</h2>
+            
+            <!-- 既存のIDリスト -->
+            <div class="space-y-3" id="app-list-container">
+                <!-- JavaScriptでここにリストが挿入されます -->
+            </div>
+
+            <!-- 新規追加・編集フォーム -->
+            <div class="pt-6 border-t">
+                <h3 id="form-title" class="text-lg font-semibold text-gray-800 mb-4">Add New Application</h3>
+                <form id="app-form" class="space-y-4">
+                    <input type="hidden" id="edit-key" value="">
+                    <div>
+                        <label for="app-name" class="form-label">App Name (表示名)</label>
+                        <input type="text" id="app-name" class="form-input" placeholder="例: 人生" required>
+                        <p class="form-desc">メイン画面のドロップダウンに表示される名前です。</p>
+                    </div>
+                    <div>
+                        <label for="app-id" class="form-label">Client ID (数値)</label>
+                        <input type="text" id="app-id" class="form-input" placeholder="18桁または19桁のClient ID" required>
+                        <p class="form-desc">Discord Developer Portal で取得したIDです。</p>
+                    </div>
+                    <div class="flex space-x-4">
+                        <button type="submit" id="save-app-btn" class="btn btn-primary w-full py-3">Add Application</button>
+                        <button type="button" id="cancel-edit-btn" class="btn btn-secondary w-full py-3 hidden">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- DOM要素 ---
+        const messageBox = document.getElementById('message-box');
+        // 誕生日
+        const birthdayInput = document.getElementById('birthday');
+        const saveBirthdayBtn = document.getElementById('save-birthday-btn');
+        // App
+        const appListContainer = document.getElementById('app-list-container');
+        const appForm = document.getElementById('app-form');
+        const formTitle = document.getElementById('form-title');
+        const editKeyInput = document.getElementById('edit-key');
+        const appNameInput = document.getElementById('app-name');
+        const appIdInput = document.getElementById('app-id');
+        const saveAppBtn = document.getElementById('save-app-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+
+        // --- デフォルト値 ---
+        const DEFAULT_BIRTHDAY = '2000-01-01';
+        
+        // ★ ご要望の標準リスト (名前を戻しました)
+        const DEFAULT_APP_LIST = [
+            { key: "life", name: "人生", id: "1430896766579900509" },
+            { key: "study", name: "勉強", id: "1430896715245817920" },
+            { key: "school", name: "学校", id: "1430896902152392754" },
+            { key: "activity", name: "デフォルト", id: "1430880499500453888" }
+        ];
+
+        let appList = []; // Client IDのリストを保持するグローバル変数
+
+        // --- メッセージボックス表示 ---
+        function showMessage(type, text) {
+            messageBox.classList.remove('hidden');
+            if (type === 'success') {
+                messageBox.className = 'p-4 mb-4 rounded-lg text-sm bg-green-100 text-green-800 border border-green-300';
+            } else if (type === 'error') {
+                messageBox.className = 'p-4 mb-4 rounded-lg text-sm bg-red-100 text-red-800 border border-red-300';
+            }
+            messageBox.textContent = text;
+            // 3秒後に自動で消す
+            setTimeout(() => { messageBox.classList.add('hidden'); }, 3000);
+        }
+
+        // --- ストレージ操作 ---
+        function saveAppSettings() {
+            try {
+                localStorage.setItem('appList', JSON.stringify(appList));
+                return true;
+            } catch (error) {
+                console.error('LocalStorage Error:', error);
+                showMessage('error', '設定の保存に失敗しました。');
+                return false;
+            }
+        }
+
+        function saveBirthdaySetting() {
+             try {
+                const birthdayValue = birthdayInput.value;
+                if (!birthdayValue) {
+                    showMessage('error', '誕生日（Birthday）を入力してください。');
+                    return;
+                }
+                localStorage.setItem('userBirthday', birthdayValue);
+                showMessage('success', '誕生日を保存しました。');
+            } catch (error) {
+                console.error('LocalStorage Error:', error);
+                showMessage('error', '誕生日の保存に失敗しました。');
+            }
+        }
+
+        // --- アプリケーションリストの描画 ---
+        function renderAppList() {
+            appListContainer.innerHTML = ''; // コンテナをクリア
+            
+            if (appList.length === 0) {
+                appListContainer.innerHTML = '<p class="text-gray-500 text-sm text-center">登録済みのアプリケーションがありません。</p>';
+                return;
+            }
+
+            appList.forEach(app => {
+                const appElement = document.createElement('div');
+                appElement.className = 'p-4 bg-gray-50 rounded-lg flex justify-between items-center border';
+                appElement.innerHTML = `
+                    <div class="flex-1 min-w-0">
+                        <p class="font-semibold text-gray-900 truncate">${app.name}</p>
+                        <p class="text-sm text-gray-500 truncate">ID: ${app.id}</p>
+                    </div>
+                    <div class="flex-shrink-0 space-x-2 ml-4">
+                        <button class="btn btn-secondary btn-sm edit-btn" data-key="${app.key}">Edit</button>
+                        <button class="btn btn-danger btn-sm delete-btn" data-key="${app.key}">Delete</button>
+                    </div>
+                `;
+                appListContainer.appendChild(appElement);
+            });
+
+            // 描画後にイベントリスナーを設定
+            document.querySelectorAll('.edit-btn').forEach(btn => {
+                btn.addEventListener('click', handleEdit);
+            });
+            document.querySelectorAll('.delete-btn').forEach(btn => {
+                btn.addEventListener('click', handleDelete);
+            });
+        }
+        
+        // --- フォームを「新規追加」モードにリセット ---
+        function resetForm() {
+            formTitle.textContent = 'Add New Application';
+            saveAppBtn.textContent = 'Add Application';
+            editKeyInput.value = '';
+            appNameInput.value = '';
+            appIdInput.value = '';
+            cancelEditBtn.classList.add('hidden');
+            appNameInput.focus();
+        }
+
+        // --- 編集ボタンの処理 ---
+        function handleEdit(e) {
+            const keyToEdit = e.target.dataset.key;
+            const appToEdit = appList.find(app => app.key === keyToEdit);
+            if (!appToEdit) return;
+
+            formTitle.textContent = 'Edit Application';
+            saveAppBtn.textContent = 'Save Changes';
+            editKeyInput.value = appToEdit.key;
+            appNameInput.value = appToEdit.name;
+            appIdInput.value = appToEdit.id;
+            cancelEditBtn.classList.remove('hidden');
+            
+            // フォームまでスクロール
+            appForm.scrollIntoView({ behavior: 'smooth' });
+            appNameInput.focus();
+        }
+
+        // --- 削除ボタンの処理 ---
+        function handleDelete(e) {
+            const keyToDelete = e.target.dataset.key;
+            // 削除確認
+            if (!confirm(`「${appList.find(a => a.key === keyToDelete)?.name}」を削除しますか？`)) {
+                return;
+            }
+            
+            appList = appList.filter(app => app.key !== keyToDelete);
+            if (saveAppSettings()) {
+                showMessage('success', 'アプリケーションを削除しました。');
+                renderAppList();
+            }
+        }
+
+        // --- フォーム送信 (新規追加・更新) の処理 ---
+        appForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            const appName = appNameInput.value.trim();
+            const appId = appIdInput.value.trim();
+            const editKey = editKeyInput.value;
+
+            // バリデーション
+            if (!appName || !appId) {
+                showMessage('error', 'App Name と Client ID は両方必須です。');
+                return;
+            }
+            if (!/^\d{18,19}$/.test(appId)) {
+                showMessage('error', 'Client ID が不正です。18桁または19桁の数値にしてください。');
+                return;
+            }
+
+            if (editKey) {
+                // --- 更新処理 ---
+                const appIndex = appList.findIndex(app => app.key === editKey);
+                if (appIndex > -1) {
+                    appList[appIndex].name = appName;
+                    appList[appIndex].id = appId;
+                    if (saveAppSettings()) {
+                        showMessage('success', 'アプリケーションを更新しました。');
+                        renderAppList();
+                        resetForm();
+                    }
+                }
+            } else {
+                // --- 新規追加処理 ---
+                // キーが重複していないかチェック (UUIDでほぼ不要だが念のため)
+                const newKey = crypto.randomUUID();
+                appList.push({ key: newKey, name: appName, id: appId });
+                if (saveAppSettings()) {
+                    showMessage('success', 'アプリケーションを追加しました。');
+                    renderAppList();
+                    resetForm(); // フォームをクリア
+                }
+            }
+        });
+        
+        // --- キャンセルボタンの処理 ---
+        cancelEditBtn.addEventListener('click', resetForm);
+        
+        // --- 誕生日保存ボタンの処理 ---
+        saveBirthdayBtn.addEventListener('click', saveBirthdaySetting);
+
+        // --- ページロード時の初期化処理 ---
+        function initializeSettings() {
+            try {
+                // 1. 誕生日の読み込み
+                const savedBirthday = localStorage.getItem('userBirthday');
+                birthdayInput.value = savedBirthday || DEFAULT_BIRTHDAY;
+                
+                // 2. アプリリストの読み込み
+                const savedAppsString = localStorage.getItem('appList');
+                if (savedAppsString) {
+                    appList = JSON.parse(savedAppsString);
+                } else {
+                    // 保存された値がなければデフォルト値を設定
+                    appList = DEFAULT_APP_LIST;
+                    saveAppSettings(); // デフォルト値を保存
+                }
+                
+                renderAppList(); // リストを描画
+
+            } catch (error) {
+                console.error('LocalStorage Error:', error);
+                // エラー時はデフォルト値を設定
+                birthdayInput.value = DEFAULT_BIRTHDAY;
+                appList = DEFAULT_APP_LIST;
+                renderAppList();
+            }
+        }
+
+        // ページを開いたときに実行
+        initializeSettings();
+    </script>
+</body>
+</html>
+
