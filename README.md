@@ -37,7 +37,7 @@ Discordのカスタムアクティビティ（ステータス）を、ローカ�
 
 3. 初回起動時、自動的に `venv` フォルダ（仮想環境）が作成され、`requirements.txt` に記載されたライブラリ（Flask, Flask-Cors, pypresence）がインストールされます。
 
-4. コンソールに `[INFO] Starting status.py...` と表示され、Webサーバーが `http://127.0.0.1:5000` で起動すれば準備完了です。
+4. コンソールに `[INFO] Starting status.py...` と表示されれば準備完了です。
 
 
 ## 起動方法 (手動 / macOS / Linux)
@@ -62,7 +62,7 @@ Discordのカスタムアクティビティ（ステータス）を、ローカ�
 6. python status.py
 
 
-6. サーバーが `http://127.0.0.1:5000` で起動すれば準備完了です。
+
 
 ## 使い方
 
